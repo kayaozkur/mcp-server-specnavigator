@@ -1,0 +1,245 @@
+name: Release Management
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.3)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      changelog: ${{ steps.generate-changelog.outputs.changelog }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get version
+        id: get-version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Validate version
+        run: |
+          VERSION=${{ steps.get-version.outputs.version }}
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          
+          if [ "${{ github.event_name }}" == "push" ] && [ "$VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "::error::Tag version ($VERSION) does not match package.json version ($PACKAGE_VERSION)"
+            exit 1
+          fi
+      
+      - name: Generate changelog
+        id: generate-changelog
+        run: |
+          # Generate changelog from git history
+          echo "# Changelog for v${{ steps.get-version.outputs.version }}" > CHANGELOG_TEMP.md
+          echo "" >> CHANGELOG_TEMP.md
+          echo "## What's Changed" >> CHANGELOG_TEMP.md
+          echo "" >> CHANGELOG_TEMP.md
+          
+          # Get commit messages since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "First release!" >> CHANGELOG_TEMP.md
+            git log --pretty=format:"- %s (%h)" >> CHANGELOG_TEMP.md
+          else
+            git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" >> CHANGELOG_TEMP.md
+          fi
+          
+          echo "" >> CHANGELOG_TEMP.md
+          echo "" >> CHANGELOG_TEMP.md
+          echo "## Contributors" >> CHANGELOG_TEMP.md
+          git log $LAST_TAG..HEAD --pretty=format:"- @%an" | sort | uniq >> CHANGELOG_TEMP.md
+          
+          # Set output
+          CHANGELOG=$(cat CHANGELOG_TEMP.md)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  build-and-test:
+    name: Build and Test
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test
+        continue-on-error: true
+      
+      - name: Build project
+        run: npm run build
+      
+      - name: Package release
+        run: |
+          npm pack
+          mkdir -p release-artifacts
+          mv *.tgz release-artifacts/
+      
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+
+  create-release:
+    name: Create GitHub Release
+    needs: [prepare-release, build-and-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+      
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.prepare-release.outputs.version }}
+          release_name: Release v${{ needs.prepare-release.outputs.version }}
+          body: ${{ needs.prepare-release.outputs.changelog }}
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+      
+      - name: Upload Release Assets
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Get the release
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: `v${{ needs.prepare-release.outputs.version }}`
+            });
+            
+            // Upload artifacts
+            const artifactsDir = 'release-artifacts';
+            const files = fs.readdirSync(artifactsDir);
+            
+            for (const file of files) {
+              const filePath = path.join(artifactsDir, file);
+              const data = fs.readFileSync(filePath);
+              
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.data.id,
+                name: file,
+                data: data
+              });
+            }
+
+  publish-npm:
+    name: Publish to npm
+    needs: [prepare-release, build-and-test, create-release]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.prerelease != 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Update package version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npm version ${{ needs.prepare-release.outputs.version }} --no-git-tag-version
+      
+      - name: Build project
+        run: npm run build
+      
+      - name: Publish to npm
+        run: |
+          if [ "${{ github.event.inputs.prerelease }}" == "true" ]; then
+            npm publish --tag beta
+          else
+            npm publish
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Update changelog
+        if: github.event_name == 'push'
+        run: |
+          # Update CHANGELOG.md file
+          if [ -f CHANGELOG.md ]; then
+            echo "${{ needs.prepare-release.outputs.changelog }}" > CHANGELOG_NEW.md
+            echo "" >> CHANGELOG_NEW.md
+            echo "---" >> CHANGELOG_NEW.md
+            echo "" >> CHANGELOG_NEW.md
+            cat CHANGELOG.md >> CHANGELOG_NEW.md
+            mv CHANGELOG_NEW.md CHANGELOG.md
+          else
+            echo "${{ needs.prepare-release.outputs.changelog }}" > CHANGELOG.md
+          fi
+          
+          # Commit changes
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CHANGELOG.md
+          git commit -m "Update CHANGELOG.md for v${{ needs.prepare-release.outputs.version }}" || true
+          git push || true

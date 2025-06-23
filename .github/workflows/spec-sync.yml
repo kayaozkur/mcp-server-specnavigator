@@ -1,0 +1,141 @@
+name: MCP Spec Sync
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update even if no changes detected'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  check-spec-updates:
+    name: Check for MCP Spec Updates
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Cache MCP spec data
+        uses: actions/cache@v4
+        with:
+          path: |
+            .spec-cache
+            node_modules/.cache/mcp-spec
+          key: mcp-spec-${{ hashFiles('**/package-lock.json') }}-${{ github.run_id }}
+          restore-keys: |
+            mcp-spec-${{ hashFiles('**/package-lock.json') }}-
+            mcp-spec-
+      
+      - name: Check for upstream spec changes
+        id: check-changes
+        run: |
+          # Create cache directory if it doesn't exist
+          mkdir -p .spec-cache
+          
+          # Download latest MCP spec
+          echo "Downloading latest MCP specification..."
+          curl -sL https://spec.modelcontextprotocol.io/specification.json -o .spec-cache/latest-spec.json || \
+            curl -sL https://raw.githubusercontent.com/modelcontextprotocol/specification/main/spec.json -o .spec-cache/latest-spec.json
+          
+          # Compare with cached version
+          if [ -f .spec-cache/current-spec.json ]; then
+            echo "Comparing specs..."
+            if ! diff -q .spec-cache/current-spec.json .spec-cache/latest-spec.json > /dev/null 2>&1; then
+              echo "changes_detected=true" >> $GITHUB_OUTPUT
+              echo "Spec changes detected!"
+              
+              # Generate diff summary
+              echo "## Spec Changes Summary" > .spec-cache/changes.md
+              echo "\`\`\`diff" >> .spec-cache/changes.md
+              diff -u .spec-cache/current-spec.json .spec-cache/latest-spec.json | head -100 >> .spec-cache/changes.md || true
+              echo "\`\`\`" >> .spec-cache/changes.md
+            else
+              echo "changes_detected=false" >> $GITHUB_OUTPUT
+              echo "No spec changes detected."
+            fi
+          else
+            echo "changes_detected=true" >> $GITHUB_OUTPUT
+            echo "First time checking, marking as changed."
+          fi
+          
+          # Update current spec
+          cp .spec-cache/latest-spec.json .spec-cache/current-spec.json
+      
+      - name: Validate spec compatibility
+        if: steps.check-changes.outputs.changes_detected == 'true' || github.event.inputs.force_update == 'true'
+        run: |
+          echo "Validating spec compatibility..."
+          # Run any spec validation scripts
+          if [ -f scripts/validate-spec.js ]; then
+            node scripts/validate-spec.js .spec-cache/latest-spec.json
+          fi
+      
+      - name: Create issue for spec changes
+        if: steps.check-changes.outputs.changes_detected == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let changesSummary = 'Spec changes detected in the latest MCP specification.';
+            
+            try {
+              if (fs.existsSync('.spec-cache/changes.md')) {
+                changesSummary = fs.readFileSync('.spec-cache/changes.md', 'utf8');
+              }
+            } catch (error) {
+              console.error('Error reading changes file:', error);
+            }
+            
+            const issueTitle = `[Spec Update] MCP Specification changed - ${new Date().toISOString().split('T')[0]}`;
+            
+            // Check if issue already exists
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'spec-update'
+            });
+            
+            const existingIssue = existingIssues.data.find(issue => 
+              issue.title.startsWith('[Spec Update]') && 
+              issue.title.includes(new Date().toISOString().split('T')[0])
+            );
+            
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: `## MCP Specification Update Detected\n\n${changesSummary}\n\n### Action Required\n- [ ] Review specification changes\n- [ ] Update implementation if needed\n- [ ] Update documentation\n- [ ] Run compatibility tests\n\n---\n*This issue was automatically created by the spec-sync workflow.*`,
+                labels: ['spec-update', 'automated']
+              });
+            }
+      
+      - name: Send notification
+        if: steps.check-changes.outputs.changes_detected == 'true' && github.event_name == 'schedule'
+        run: |
+          echo "::notice title=MCP Spec Updated::The MCP specification has been updated. Please review the changes and update the implementation if necessary."
+      
+      - name: Upload spec artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec-cache-${{ github.run_id }}
+          path: .spec-cache/
+          retention-days: 30
