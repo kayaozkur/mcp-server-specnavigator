@@ -43,7 +43,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'fetch_spec_updates': {
-        const forceRefresh = args?.force_refresh || false;
+        const forceRefresh = (args?.force_refresh as boolean) || false;
         const result = await specFetcher.checkForUpdates(forceRefresh);
         return {
           content: [
@@ -56,8 +56,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'generate_markdown_tree': {
-        const maxDepth = args?.max_depth || 3;
-        const includeAnchors = args?.include_anchors || true;
+        const maxDepth = (args?.max_depth as number) || 3;
+        const includeAnchors = (args?.include_anchors as boolean) ?? true;
         const spec = await specFetcher.getSpec();
         const tree = await treeGenerator.generateTree(spec, {
           maxDepth,
@@ -80,8 +80,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const spec = await specFetcher.getSpec();
         const results = await anchorNavigator.findSections(
           spec,
-          args.query,
-          args.fuzzy || false
+          args.query as string,
+          (args.fuzzy as boolean) || false
         );
         return {
           content: [
@@ -100,8 +100,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const spec = await specFetcher.getSpec();
         const content = await anchorNavigator.getSectionContent(
           spec,
-          args.section_path,
-          args.include_subsections || false
+          args.section_path as string,
+          (args.include_subsections as boolean) || false
         );
         return {
           content: [

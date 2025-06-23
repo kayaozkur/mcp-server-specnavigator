@@ -1,8 +1,6 @@
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
-import remarkStringify from 'remark-stringify';
-import { toc } from 'mdast-util-toc';
-import type { Root, Heading, List, ListItem } from 'mdast';
+import type { Root } from 'mdast';
 
 export interface TreeOptions {
   maxDepth: number;
@@ -11,7 +9,7 @@ export interface TreeOptions {
 
 export class MarkdownTreeGenerator {
   async generateTree(markdown: string, options: TreeOptions): Promise<string> {
-    const { maxDepth, includeAnchors } = options;
+    const { maxDepth } = options;
 
     // Parse the markdown
     const processor = unified().use(remarkParse);
@@ -21,7 +19,7 @@ export class MarkdownTreeGenerator {
     const headings = this.extractHeadings(tree, maxDepth);
 
     // Generate table of contents
-    const tocTree = this.buildTocTree(headings, includeAnchors);
+    const tocTree = this.buildTocTree(headings);
 
     // Convert to markdown string
     return this.renderTree(tocTree, 0);
@@ -73,8 +71,7 @@ export class MarkdownTreeGenerator {
   }
 
   private buildTocTree(
-    headings: Array<{ depth: number; text: string; anchor: string }>,
-    includeAnchors: boolean
+    headings: Array<{ depth: number; text: string; anchor: string }>
   ): any {
     const root: any = {
       children: [],
@@ -167,7 +164,6 @@ export class MarkdownTreeGenerator {
   async generateCompactTree(markdown: string): Promise<string> {
     const headings = await this.extractAllHeadings(markdown);
     let tree = '';
-    let currentDepth = 0;
 
     for (const heading of headings) {
       const indent = '  '.repeat(heading.depth - 1);
