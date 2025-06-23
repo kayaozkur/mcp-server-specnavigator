@@ -1,21 +1,23 @@
 # @lepion/mcp-server-specnavigator
 
-An MCP (Model Context Protocol) server for navigating and exploring Model Context Protocol specifications with dynamic markdown tree generation and intelligent section navigation.
+[![npm version](https://badge.fury.io/js/@lepion%2Fmcp-server-specnavigator.svg)](https://www.npmjs.com/package/@lepion/mcp-server-specnavigator)
 
-## Attribution
+An intelligent MCP (Model Context Protocol) server for navigating, exploring, and understanding the Model Context Protocol specification with dynamic markdown tree generation, intelligent section navigation, and upstream synchronization.
 
-This project is based on the Model Context Protocol specification from https://github.com/modelcontextprotocol/modelcontextprotocol
+## 🎯 Purpose
 
-## Purpose
+The MCP SpecNavigator server transforms the way you interact with MCP specifications by providing:
+- 🌳 **Dynamic Markdown Trees** - Navigate specifications with auto-generated tree structures
+- 🔍 **Intelligent Search** - Find sections instantly with keyword search and anchor links
+- 🔄 **Upstream Sync** - Stay updated with the latest specification changes
+- 📚 **Contextual Documentation** - Access specific sections on-demand
+- ⚡ **Performance Optimized** - Efficient caching for fast responses
 
-The MCP SpecNavigator server provides tools to:
-- Navigate MCP specifications dynamically
-- Generate markdown tree structures for easy exploration
-- Search and find specific sections with anchor links
-- Fetch and cache upstream specification updates
-- Provide contextual access to MCP documentation
+## 📋 Attribution
 
-## Features
+This project is based on and provides navigation for the [Model Context Protocol specification](https://github.com/modelcontextprotocol/modelcontextprotocol) created by the Model Context Protocol team. This is a wrapper/navigation tool that enhances access to the original specification.
+
+## ✨ Features
 
 - **Dynamic Markdown Tree Generation**: Automatically generates navigable tree structures from MCP specifications
 - **Intelligent Section Search**: Find sections by keywords and get direct anchor links
@@ -23,11 +25,17 @@ The MCP SpecNavigator server provides tools to:
 - **Upstream Synchronization**: Check for updates from the official MCP repository
 - **Section Content Retrieval**: Get specific sections of the specification on demand
 
-## Installation
+## 📦 Installation
 
+### Via npm (Recommended)
+```bash
+npm install -g @lepion/mcp-server-specnavigator
+```
+
+### From Source
 ```bash
 # Clone the repository
-git clone https://github.com/lepion/mcp-server-specnavigator.git
+git clone https://github.com/kayaozkur/mcp-server-specnavigator.git
 cd mcp-server-specnavigator
 
 # Install dependencies
@@ -47,7 +55,7 @@ npm start
 npm run dev
 ```
 
-## Available Tools
+## 🛠️ Available Tools
 
 ### 1. `fetch_spec_updates`
 Check for upstream changes in the MCP specification repository.
@@ -88,16 +96,21 @@ Retrieve content from a specific section of the specification.
 **Returns:**
 - Markdown content of the requested section
 
-## MCP Configuration
+## ⚙️ MCP Configuration
 
-To use this server with Claude Desktop or other MCP clients, add the following to your MCP configuration:
+### For Claude Desktop
+
+Add to your Claude Desktop configuration:
+
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "specnavigator": {
-      "command": "node",
-      "args": ["/path/to/mcp-server-specnavigator/dist/index.js"],
+      "command": "npx",
+      "args": ["@lepion/mcp-server-specnavigator"],
       "env": {
         "NODE_ENV": "production"
       }
@@ -106,7 +119,22 @@ To use this server with Claude Desktop or other MCP clients, add the following t
 }
 ```
 
-## Architecture
+### For Development
+```json
+{
+  "mcpServers": {
+    "specnavigator": {
+      "command": "node",
+      "args": ["/path/to/mcp-server-specnavigator/dist/index.js"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
+```
+
+## 🏗️ Architecture
 
 ```
 src/
@@ -117,34 +145,44 @@ src/
 └── tools.ts                   # MCP tool definitions
 ```
 
-## Development
+## 🧪 Development
 
 ### Running Tests
-
 ```bash
 npm test
 ```
 
 ### Linting
-
 ```bash
 npm run lint
 ```
 
 ### Formatting
-
 ```bash
 npm run format
 ```
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
-## License
+## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-Special thanks to the Model Context Protocol team for creating the specification and protocol that this server navigates.
+- **Model Context Protocol Team** - For creating the [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol) that this server navigates
+- **Anthropic** - For developing the Model Context Protocol standard
+- **Contributors** - Everyone who has contributed to improving this navigation tool
+
+## 🔗 Links
+
+- [NPM Package](https://www.npmjs.com/package/@lepion/mcp-server-specnavigator)
+- [GitHub Repository](https://github.com/kayaozkur/mcp-server-specnavigator)
+- [Model Context Protocol Specification](https://github.com/modelcontextprotocol/modelcontextprotocol)
+- [Report Issues](https://github.com/kayaozkur/mcp-server-specnavigator/issues)
+
+---
+
+Built with ❤️ by the Lepion Team
