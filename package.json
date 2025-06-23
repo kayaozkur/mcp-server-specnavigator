@@ -23,7 +23,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lepion/mcp-server-specnavigator"
+    "url": "git+https://github.com/kayaozkur/mcp-server-specnavigator.git"
   },
   "attribution": {
     "original": "https://github.com/modelcontextprotocol/modelcontextprotocol",
