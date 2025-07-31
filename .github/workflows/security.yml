@@ -9,6 +9,11 @@ on:
     # Run security scan daily at 3 AM UTC
     - cron: '0 3 * * *'
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
 jobs:
   security-scan:
     runs-on: ubuntu-latest
@@ -51,7 +56,7 @@ jobs:
     - name: CodeQL Analysis
       uses: github/codeql-action/init@v3
       with:
-        languages: typescript
+        languages: javascript-typescript
         
     - name: Build for CodeQL
       run: npm run build
