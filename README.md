@@ -178,7 +178,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
 
-- [NPM Package](https://www.npmjs.com/package/@lepion/mcp-server-specnavigator)
+- [NPM Package](https://www.npmjs.com/package/@lepion/mcp-server-specnavigator) NOT AVAILABLE AT THIS POINT
 - [GitHub Repository](https://github.com/kayaozkur/mcp-server-specnavigator)
 - [Model Context Protocol Specification](https://github.com/modelcontextprotocol/modelcontextprotocol)
 - [Report Issues](https://github.com/kayaozkur/mcp-server-specnavigator/issues)
