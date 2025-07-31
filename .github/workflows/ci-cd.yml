@@ -104,16 +104,22 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/github-script@v7
         with:
-          tag_name: v${{ github.run_number }}
-          release_name: Release v${{ github.run_number }}
-          body: |
-            Automated release from CI/CD pipeline
-            
-            Commit: ${{ github.sha }}
-            Message: ${{ github.event.head_commit.message }}
-          draft: false
-          prerelease: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = `v${{ github.run_number }}`;
+            const release = await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: tag,
+              name: `Release ${tag}`,
+              body: `Automated release from CI/CD pipeline
+              
+              Commit: ${{ github.sha }}
+              Message: ${{ github.event.head_commit.message }}`,
+              draft: false,
+              prerelease: false
+            });
+            console.log(`Created release ${release.data.html_url}`);
